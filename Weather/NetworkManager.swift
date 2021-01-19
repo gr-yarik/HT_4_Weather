@@ -10,70 +10,86 @@ import Foundation
 import CoreLocation
 
 protocol NetworkManagerDelegate {
-    func updateUI(_ : NetworkManager, withWeather currentWeather: [CityTableWeather])
+    func updateUI(_ : NetworkManager, withWeather currentWeather: CityTableWeather)
 }
 
 class NetworkManager {
     
     var delegate: NetworkManagerDelegate?
+//    var respondFor: ResponseType!
+    
+    var onCompletion: ((CityTableWeather, [CityTableWeather], ResponceType) -> Void)?
     
     enum RequestType {
-        case byCityNames(cityNames: [String])
         case byCityName(cityName: String)
+        case byCityNames(cityNames: [String])
         case byCoordinates(longtitude: CLLocationDegrees, latitude: CLLocationDegrees)
     }
     
-    func fetchCurrentWeather(searchBy requestType: RequestType, completion: ([CityTableWeather]) -> ()) {
-        var url = ""
+    enum ResponseType {
+        case forLocation
+        case forStoredCity
+    }
+    
+    
+    func fetchCurrentWeather(searchBy requestType: RequestType) {
+//        var url = ""
         switch requestType {
-        case .byCityNames(let cityNames):
-            var weathers: [CityTableWeather] = []
-            for name in cityNames {
-                url = "https://api.openweathermap.org/data/2.5/weather?q=\(name)&apikey=\(apiKey)&units=metric"
-                APICall(urlString: url) { (weather) in
-                    print(weather)
-                    weathers.append(weather)
+        case .byCityName(let cityName):
+            let urlString = "https://api.openweathermap.org/data/2.5/weather?q=\(cityName)&apikey=\(apiKey)&units=metric"
+            guard let url = URL(string: urlString) else { return }
+            let session = URLSession(configuration: .default)
+            let task = session.dataTask(with: url) { (data, responce, error) in
+                if let data = data {
+                    if let currentWeather = self.JSONParse(withData: data) {
+                        self.onCompletion?(currentWeather)
+                    }
                 }
             }
-            print(weathers)
-            completion(weathers)
-        case .byCityName(let cityName):
-            url = "https://api.openweathermap.org/data/2.5/weather?q=\(cityName)&apikey=\(apiKey)&units=metric"
+            task.resume()
             
         case .byCoordinates(let longtitude, let latitude):
-            url = "https://api.openweathermap.org/data/2.5/weather?lat=\(latitude)&lon=\(longtitude)&appid=\(apiKey)&units=metric"
-            
+            let url = "https://api.openweathermap.org/data/2.5/weather?lat=\(latitude)&lon=\(longtitude)&appid=\(apiKey)&units=metric"
         }
 //        APICall(urlString: url)
     }
     
-    fileprivate func APICall (urlString: String, completion: @escaping (CityTableWeather) -> ()) {
+    
+    func checkIfValidCityName(cityName: String, completion: @escaping (Bool) -> ()) {
+        let name = cityName.split(separator: " ").joined(separator: "%20")
+        let urlString = "https://api.openweathermap.org/data/2.5/weather?q=\(name)&apikey=\(apiKey)&units=metric"
         guard let url = URL(string: urlString) else { return }
         let session = URLSession(configuration: .default)
         let task = session.dataTask(with: url) { (data, responce, error) in
-//            print(data)
+            completion((responce as! HTTPURLResponse).statusCode == 200 ? true : false)
+        }
+        task.resume()
+    }
+    
+    
+    fileprivate func APICall (urlString: String){
+        guard let url = URL(string: urlString) else { return }
+        let session = URLSession(configuration: .default)
+        let task = session.dataTask(with: url) { (data, responce, error) in
             if let data = data {
-                let weather = self.JSONParse(withData: data)
-                print(weather)
-                completion(weather)
+                if let currentWeather = self.JSONParse(withData: data) {
+                    self.onCompletion?(currentWeather)
+                }
             }
         }
         task.resume()
     }
     
-    fileprivate func JSONParse(withData data: Data) -> CityTableWeather {
-        print(data)
+    fileprivate func JSONParse(withData data: Data) -> CityTableWeather? {
         let decoder = JSONDecoder()
-        var currentWeather: CityTableWeather!
         do {
             let currentWeatherData = try decoder.decode(CityTableWeatherData.self, from: data)
-            currentWeather = CityTableWeather(currentWeatherData: currentWeatherData)
+            let currentWeather = CityTableWeather(currentWeatherData: currentWeatherData)
             return currentWeather
-//            delegate?.updateUI(self, withWeather: currentWeather)
         } catch let error as NSError {
             print(error.localizedDescription)
         }
-        return currentWeather
+        return nil
     }
 }
 

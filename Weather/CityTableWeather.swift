@@ -10,7 +10,7 @@ import Foundation
 struct CityTableWeather {
     let temperature: Double
     var temperatureString: String {
-        return "\(Int(round(temperature)))"
+        return "\(Int(round(temperature))) °C"
     }
     
     let feelsLikeTempereture: Double

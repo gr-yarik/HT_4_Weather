@@ -25,10 +25,12 @@ class Storage: StorageProtocol {
         }
         
         cities = UserDefaults.standard.stringArray(forKey: "cities") ?? [String]()
+        print(cities)
     }
     
     
     func getCities() -> [String] {
+        print("cities = ", cities)
         return cities
     }
     

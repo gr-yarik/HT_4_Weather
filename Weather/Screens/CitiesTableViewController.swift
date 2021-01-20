@@ -31,43 +31,43 @@ class CitiesTableViewController: DataLoadingVC {
     
     var citiesWeather: [CityTableWeather] = [] {
         didSet {
-            print("citiesWeather.count = ", citiesWeather.count)
-//            if citiesWeather.count == cityNames.count {
-//            citiesWeather.sort { (c1, c2) -> Bool in
-//                c1.cityName < c2.cityName
-//            }
-            DispatchQueue.main.async {
-                self.tableView.reloadData()
+            dismissLoadingView()
+            citiesWeather.sort { (c1, c2) -> Bool in
+                c1.cityName < c2.cityName
             }
-//        }
         }
     }
     
     var localWeather: CityTableWeather! {
         didSet {
-            print("local weather = ", localWeather!)
+//            print("local weather = ", localWeather!)
             DispatchQueue.main.async {
                 self.tableView.reloadData()
             }
         }
     }
     
+    var currentWeather: CityTableWeather!
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-//        networkManager.delegate = self
         locationManager.delegate = self
         if CLLocationManager.locationServicesEnabled() {
             locationManager.requestWhenInUseAuthorization()
             locationManager.requestLocation()
         }
         storage = Storage()
-        networkManager.onCompletion = { [weak self] currentWeather, type in
+        networkManager.onCompletion = { [weak self] weather, weathers, forecast, responceType in
             guard let self = self else { return }
-            switch type {
-            case .forLocation:
-                self.localWeather = currentWeather
+            switch responceType {
+            case .forLiveLocation:
+                self.localWeather = weather
             case .forStoredCity:
-                self.citiesWeather.append(currentWeather)
+                break
+            case .forStoredCities:
+                self.citiesWeather = weathers!
+            case .forFourDays:
+                break
             }
             DispatchQueue.main.async {
                 self.tableView.reloadData()
@@ -80,12 +80,10 @@ class CitiesTableViewController: DataLoadingVC {
     
     
     func presentWeather() {
-        print(citiesWeather)
-//        citiesWeather = []
-        for name in cityNames {
-            let cityName = name.split(separator: " ").joined(separator: "%20")
-            networkManager.fetchCurrentWeather(searchBy: .byCityName(cityName: cityName))
+        DispatchQueue.main.async {
+            self.showLoadingView()
         }
+        networkManager.fetchCurrentWeather(searchBy: .byCityNames(cityNames: cityNames))
     }
     
     
@@ -116,6 +114,22 @@ class CitiesTableViewController: DataLoadingVC {
         }
     }
     
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        switch indexPath.section {
+        case 0:
+            currentWeather = localWeather
+        case 1:
+            currentWeather = citiesWeather[indexPath.row]
+        default:
+            return
+        }
+        performSegue(withIdentifier: "details", sender: nil)
+    }
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        let destVC = segue.destination as! DetailedWeatherViewController
+        destVC.cityWeather = currentWeather
+    }
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch section {
@@ -135,6 +149,7 @@ class CitiesTableViewController: DataLoadingVC {
         return 2
     }
     
+    
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         switch section {
         case 0:
@@ -145,6 +160,7 @@ class CitiesTableViewController: DataLoadingVC {
             return ""
         }
     }
+    
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath) as! CityTableViewCell
@@ -166,9 +182,9 @@ extension CitiesTableViewController: CLLocationManagerDelegate {
         print(error)
     }
     
+    
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let longtitude = locations.last?.coordinate.longitude, let latitude = locations.last?.coordinate.latitude else { return }
         networkManager.fetchCurrentWeather(searchBy: .byCoordinates(longtitude: longtitude, latitude: latitude))
-        
     }
 }

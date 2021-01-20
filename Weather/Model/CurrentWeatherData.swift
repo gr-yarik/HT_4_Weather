@@ -1,5 +1,5 @@
 //
-//  CityTableWeatherData.swift
+//  CurrentWeatherData.swift
 //  Weather
 //
 //  Created by Yaroslav Hrytsun on 19.01.2021.
@@ -7,15 +7,17 @@
 
 import Foundation
 
-struct CityTableWeatherData: Codable {
+struct CurrentWeatherData: Codable {
     let weather: [Weather]
     let main: Main
     let cityName: String
+    let wind: Wind
     
     enum CodingKeys: String, CodingKey {
         case weather
         case main
         case cityName = "name"
+        case wind
     }
 }
 
@@ -31,4 +33,8 @@ struct Main: Codable {
 
 struct Weather: Codable {
     let id: Int
+}
+
+struct Wind: Codable {
+    let speed: Double
 }

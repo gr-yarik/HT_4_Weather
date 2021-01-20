@@ -19,13 +19,13 @@ class Storage: StorageProtocol {
     init() {
         if !UserDefaults.standard.bool(forKey: "firstLaunch") {
             UserDefaults.standard.set(true, forKey: "firstLaunch")
-            let initialCities = ["Kyiv", "London"]
+            let initialCities = ["Kyiv", "Dnipro"]
             UserDefaults.standard.set(initialCities, forKey: "cities")
             print("first launch")
         }
         
         cities = UserDefaults.standard.stringArray(forKey: "cities") ?? [String]()
-        print(cities)
+//        print(cities)
     }
     
     

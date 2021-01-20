@@ -1,24 +1,28 @@
 //
-//  CityTableWeather.swift
+//  FourDayForecast.swift
 //  Weather
 //
-//  Created by Yaroslav Hrytsun on 19.01.2021.
+//  Created by Yaroslav Hrytsun on 20.01.2021.
 //
 
 import Foundation
 
-struct CityTableWeather {
+struct FourDayForecast {
     let temperature: Double
     var temperatureString: String {
         return "\(Int(round(temperature))) °C"
     }
-    
-    let feelsLikeTempereture: Double
-    var feelsLikeTemperatureString: String {
-        return "\(Int(round(feelsLikeTempereture))) °C"
+
+    let date: String
+    var dateConverted: String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "DD.MM"
+        return dateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(dateSince1970)))
+        
     }
     
-    let cityName: String
+    
+    let dateSince1970: Int
     
     let id: Int
     var icon: String {
@@ -35,10 +39,10 @@ struct CityTableWeather {
         }
     }
     
-    init(currentWeatherData: CityTableWeatherData){
-        temperature = currentWeatherData.main.temperature
-        feelsLikeTempereture = currentWeatherData.main.feelsLikeTemperature
-        cityName = currentWeatherData.cityName
-        id = currentWeatherData.weather.first?.id ?? 1110
+    init(oneDayForecast: OneDayForecast){
+        temperature = oneDayForecast.main.temperature
+        date = oneDayForecast.date
+        id = oneDayForecast.weather.first?.id ?? 110
+        dateSince1970 = oneDayForecast.dateSince1970
     }
 }

@@ -21,16 +21,13 @@ class Storage: StorageProtocol {
             UserDefaults.standard.set(true, forKey: "firstLaunch")
             let initialCities = ["Kyiv", "Dnipro"]
             UserDefaults.standard.set(initialCities, forKey: "cities")
-            print("first launch")
         }
         
         cities = UserDefaults.standard.stringArray(forKey: "cities") ?? [String]()
-//        print(cities)
     }
     
     
     func getCities() -> [String] {
-        print("cities = ", cities)
         return cities
     }
     

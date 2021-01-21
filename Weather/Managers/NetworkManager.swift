@@ -9,88 +9,58 @@
 import Foundation
 import CoreLocation
 
-protocol NetworkManagerDelegate {
-    func updateUI(_ : NetworkManager, withWeather currentWeather: CityTableWeather)
-}
 
 class NetworkManager {
-    
-    var delegate: NetworkManagerDelegate?
-    
-    var onCompletion: ((CityTableWeather?, [CityTableWeather]?, [FourDayForecast]?, ResponceType) -> Void)?
-    
-    enum RequestType {
-        case byCityName(cityName: String)
-        case byCityNames(cityNames: [String])
-        case byCoordinates(longtitude: CLLocationDegrees, latitude: CLLocationDegrees)
-    }
-    
-    enum ResponceType {
-        case forLiveLocation
-        case forStoredCity
-        case forStoredCities
-        case forFourDays
-    }
-    
-    
-    func fetchCurrentWeather(searchBy requestType: RequestType) {
-        switch requestType {
-        case .byCityName(let name):
-            let cityName = name.split(separator: " ").joined(separator: "%20")
-            let urlString = "https://api.openweathermap.org/data/2.5/forecast?q=\(cityName)&apikey=\(apiKey)&units=metric"
-            guard let url = URL(string: urlString) else { return }
-            let session = URLSession(configuration: .default)
-            let task = session.dataTask(with: url) { (data, responce, error) in
-//                print(responce as! HTTPURLResponse)
-                if let data = data {
-                    let decoder = JSONDecoder()
-                    do {
-                        let currentWeatherData = try decoder.decode(FourDayForecastData.self, from: data)
-                        var fourDayForecast: [FourDayForecast] = []
-                        for forecast in currentWeatherData.weatherData {
-                            if forecast.date.hasSuffix("12:00:00") {
-                                let formatted = FourDayForecast(oneDayForecast: forecast)
-                                fourDayForecast.append(formatted)
-                            }
-                        }
-                        fourDayForecast.removeLast()
-                        self.onCompletion?(nil, nil, fourDayForecast, .forFourDays)
-                    } catch let error as NSError {
-                        print(error.localizedDescription)
-                    }
-                    
-//                        completion(currentWeather)
-                    
-                }
-            }
-            task.resume()
-            
+
+    func fetchWeatherForCities(cityNames: [String], completion: @escaping ([CurrentCityWeather]) -> ()) {
+        var weathers: [CurrentCityWeather] = []
+        let myGroup = DispatchGroup()
+        for cityName in cityNames {
+            myGroup.enter()
+            let name = cityName.split(separator: " ").joined(separator: "%20")
+            let urlString = "https://api.openweathermap.org/data/2.5/weather?q=\(name)&apikey=\(apiKey)&units=metric"
             APICall(urlString: urlString) { weather in
-                self.onCompletion?(weather, nil, nil, .forStoredCity)
+                weathers.append(weather)
+                myGroup.leave()
             }
-            
-        case .byCoordinates(let longtitude, let latitude):
-            let urlString = "https://api.openweathermap.org/data/2.5/weather?lat=\(latitude)&lon=\(longtitude)&appid=\(apiKey)&units=metric"
-            APICall(urlString: urlString) { weather in
-                self.onCompletion?(weather, nil, nil, .forLiveLocation)
-            }
-            
-        case .byCityNames(let names):
-            var weathers: [CityTableWeather] = []
-            let myGroup = DispatchGroup()
-            for cityName in names {
-                myGroup.enter()
-                let name = cityName.split(separator: " ").joined(separator: "%20")
-                let urlString = "https://api.openweathermap.org/data/2.5/weather?q=\(name)&apikey=\(apiKey)&units=metric"
-                APICall(urlString: urlString) { weather in
-                    weathers.append(weather)
-                    myGroup.leave()
-                }
-            }
-            myGroup.notify(queue: .main) {
-                self.onCompletion?(nil, weathers, nil, .forStoredCities)
-               }
         }
+        myGroup.notify(queue: .main) {
+            completion(weathers)
+        }
+    }
+    
+    
+    func fetchWeatherForCityByCoordinates(longtitude: CLLocationDegrees, latitude: CLLocationDegrees, completion: @escaping (CurrentCityWeather) -> ()) {
+        let urlString = "https://api.openweathermap.org/data/2.5/weather?lat=\(latitude)&lon=\(longtitude)&appid=\(apiKey)&units=metric"
+        APICall(urlString: urlString, completion: completion)
+    }
+    
+    
+    func fetchWeatherForecastForCity(name: String, completion: @escaping ([ShortCityWeather]) -> ()) {
+        let cityName = name.split(separator: " ").joined(separator: "%20")
+        let urlString = "https://api.openweathermap.org/data/2.5/forecast?q=\(cityName)&apikey=\(apiKey)&units=metric"
+        guard let url = URL(string: urlString) else { return }
+        let session = URLSession(configuration: .default)
+        let task = session.dataTask(with: url) { (data, responce, error) in
+            if let data = data {
+                let decoder = JSONDecoder()
+                do {
+                    let currentWeatherData = try decoder.decode(ShortCityWeatherData.self, from: data)
+                    var fourDayForecast: [ShortCityWeather] = []
+                    for forecast in currentWeatherData.weatherData {
+                        if forecast.date.hasSuffix("12:00:00") {
+                            let formatted = ShortCityWeather(oneDayForecast: forecast)
+                            fourDayForecast.append(formatted)
+                        }
+                    }
+                    fourDayForecast.removeLast()
+                    completion(fourDayForecast)
+                } catch let error as NSError {
+                    print(error.localizedDescription)
+                }
+            }
+        }
+        task.resume()
     }
     
     
@@ -105,8 +75,8 @@ class NetworkManager {
         task.resume()
     }
     
-//    
-    fileprivate func APICall (urlString: String, completion: @escaping (CityTableWeather) -> ()){
+
+    fileprivate func APICall(urlString: String, completion: @escaping (CurrentCityWeather) -> ()){
         guard let url = URL(string: urlString) else { return }
         let session = URLSession(configuration: .default)
         let task = session.dataTask(with: url) { (data, responce, error) in
@@ -119,11 +89,11 @@ class NetworkManager {
         task.resume()
     }
     
-    fileprivate func JSONParse(withData data: Data) -> CityTableWeather? {
+    fileprivate func JSONParse(withData data: Data) -> CurrentCityWeather? {
         let decoder = JSONDecoder()
         do {
-            let currentWeatherData = try decoder.decode(CurrentWeatherData.self, from: data)
-            let currentWeather = CityTableWeather(currentWeatherData: currentWeatherData)
+            let currentWeatherData = try decoder.decode(CurrentCityWeatherData.self, from: data)
+            let currentWeather = CurrentCityWeather(currentWeatherData: currentWeatherData)
             return currentWeather
         } catch let error as NSError {
             print(error.localizedDescription)

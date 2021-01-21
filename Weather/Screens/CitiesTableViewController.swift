@@ -8,86 +8,79 @@
 import UIKit
 import CoreLocation
 
-class CitiesTableViewController: DataLoadingVC {
+class CitiesTableViewController: DataLoadingTableVC {
     
     @IBOutlet weak var nameLabel:           UILabel!
     @IBOutlet weak var iconImageview:       UIImageView!
     @IBOutlet weak var temperatureLabel:    UILabel!
     
-    var networkManager = NetworkManager()
+    var networkManager: NetworkManager!
     
     lazy var locationManager: CLLocationManager = {
-        let locationManager = CLLocationManager()
+        let locationManager             = CLLocationManager()
         locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
         return locationManager
     }()
     
     var storage: Storage!
+    
     var cityNames: [String] {
-        get {
             storage.getCities()
-        }
     }
     
-    var citiesWeather: [CityTableWeather] = [] {
+    var weatherForStoredCities: [CurrentCityWeather] = [] {
         didSet {
             dismissLoadingView()
-            citiesWeather.sort { (c1, c2) -> Bool in
+            weatherForStoredCities.sort { (c1, c2) -> Bool in
                 c1.cityName < c2.cityName
             }
-        }
-    }
-    
-    var localWeather: CityTableWeather! {
-        didSet {
-//            print("local weather = ", localWeather!)
             DispatchQueue.main.async {
                 self.tableView.reloadData()
             }
         }
     }
     
-    var currentWeather: CityTableWeather!
+    var weatherAtLiveLocation: CurrentCityWeather! {
+        didSet {
+            DispatchQueue.main.async {
+                self.tableView.reloadData()
+            }
+        }
+    }
+    
+    var weatherAtSelectedCell: CurrentCityWeather!
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        locationManager.delegate = self
+        networkManager = NetworkManager()
+        storage = Storage()
+        setUpLocationManager()
+        getWeatherForStoredCities()
+    }
+    
+    
+    func setUpLocationManager() {
+        locationManager.delegate  = self
         if CLLocationManager.locationServicesEnabled() {
             locationManager.requestWhenInUseAuthorization()
             locationManager.requestLocation()
         }
-        storage = Storage()
-        networkManager.onCompletion = { [weak self] weather, weathers, forecast, responceType in
-            guard let self = self else { return }
-            switch responceType {
-            case .forLiveLocation:
-                self.localWeather = weather
-            case .forStoredCity:
-                break
-            case .forStoredCities:
-                self.citiesWeather = weathers!
-            case .forFourDays:
-                break
-            }
-            DispatchQueue.main.async {
-                self.tableView.reloadData()
-            }
-        }
-        
-        presentWeather()
-        
     }
     
     
-    func presentWeather() {
+    func getWeatherForStoredCities() {
         DispatchQueue.main.async {
             self.showLoadingView()
         }
-        networkManager.fetchCurrentWeather(searchBy: .byCityNames(cityNames: cityNames))
+        networkManager.fetchWeatherForCities(cityNames: cityNames) { [weak self] weatherForStoredCities in
+            guard let self = self else { return }
+            self.weatherForStoredCities = weatherForStoredCities
+        }
     }
     
     
     @IBAction func addCityPressed(_ sender: Any) {
+        // в кастомный алерт контроллер не стал выносить, хотя пытался, так как нужно пробрасывать в него и storage, и networkManager, такой вот trade-off
         let alertVC = UIAlertController(title: "Add City", message: "Enter city's name", preferredStyle: .alert)
         alertVC.addTextField(configurationHandler: nil)
         let cancelAction = UIAlertAction(title: "Cancel", style: .destructive, handler: nil)
@@ -97,7 +90,7 @@ class CitiesTableViewController: DataLoadingVC {
             self.networkManager.checkIfValidCityName(cityName: cityName!) { isValid in
                 if isValid {
                     self.storage.addCity(name: cityName!)
-                    self.presentWeather()
+                    self.getWeatherForStoredCities()
                 } else {
                     DispatchQueue.main.async {
                     let alertVC = UIAlertController(title: "Error", message: "This city doesn't exist. Please try again", preferredStyle: .alert)
@@ -114,34 +107,36 @@ class CitiesTableViewController: DataLoadingVC {
         }
     }
     
+    
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         switch indexPath.section {
         case 0:
-            currentWeather = localWeather
+            weatherAtSelectedCell = weatherAtLiveLocation
         case 1:
-            currentWeather = citiesWeather[indexPath.row]
+            weatherAtSelectedCell = weatherForStoredCities[indexPath.row]
         default:
             return
         }
         performSegue(withIdentifier: "details", sender: nil)
+        tableView.deselectRow(at: indexPath, animated: true)
     }
+    
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         let destVC = segue.destination as! DetailedWeatherViewController
-        destVC.cityWeather = currentWeather
+        destVC.cityWeather = weatherAtSelectedCell
     }
+    
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch section {
         case 0:
-//            print(localWeather)
-            return localWeather == nil ? 0 : 1
+            return weatherAtLiveLocation == nil ? 0 : 1
         case 1:
-            return citiesWeather.count
+            return weatherForStoredCities.count
         default:
             return 0
         }
-        
     }
     
     
@@ -166,9 +161,9 @@ class CitiesTableViewController: DataLoadingVC {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath) as! CityTableViewCell
         switch indexPath.section {
         case 0:
-            cell.setCell(name: localWeather.cityName, icon: UIImage(systemName: localWeather.icon)!, tempeature: localWeather.temperatureString)
+            cell.setCell(name: weatherAtLiveLocation.cityName, icon: UIImage(systemName: weatherAtLiveLocation.icon)!, tempeature: weatherAtLiveLocation.temperatureString)
         case 1:
-            let weather = citiesWeather[indexPath.row]
+            let weather = weatherForStoredCities[indexPath.row]
             cell.setCell(name: weather.cityName, icon: UIImage(systemName: weather.icon)!, tempeature: weather.temperatureString)
         default:
             return UITableViewCell()
@@ -185,6 +180,9 @@ extension CitiesTableViewController: CLLocationManagerDelegate {
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let longtitude = locations.last?.coordinate.longitude, let latitude = locations.last?.coordinate.latitude else { return }
-        networkManager.fetchCurrentWeather(searchBy: .byCoordinates(longtitude: longtitude, latitude: latitude))
+        networkManager.fetchWeatherForCityByCoordinates(longtitude: longtitude, latitude: latitude) { [weak self] weatherAtLiveLocation in
+            guard let self = self else { return }
+            self.weatherAtLiveLocation = weatherAtLiveLocation
+        }
     }
 }

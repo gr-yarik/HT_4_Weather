@@ -7,8 +7,7 @@
 
 import UIKit
 
-class DetailedWeatherViewController: UIViewController {
-    
+class DetailedWeatherViewController: DataLoadingVC {
     
     @IBOutlet weak var topView: UIView!
     @IBOutlet weak var botomView: UIView!
@@ -19,41 +18,46 @@ class DetailedWeatherViewController: UIViewController {
     @IBOutlet weak var windLabel: UILabel!
     @IBOutlet weak var weatherImageView: UIImageView!
     
-    var forecasts: [FourDayForecast] = []
-    
-    var cityWeather: CityTableWeather!
-    let networkManager = NetworkManager()
+    var cityWeather: CurrentCityWeather!
+    var networkManager: NetworkManager!
     
     override func viewDidLoad() {
-        topView.layer.cornerRadius = 20
-        botomView.layer.cornerRadius = 20
-        networkManager.onCompletion = { [weak self] weather, _, forecast, responceType in
-            guard let self = self else { return }
-            switch responceType {
-            case .forLiveLocation:
-                break
-            case .forStoredCity:
-                break
-            case .forStoredCities:
-                break
-            case .forFourDays:
-                //                print(forecast!.count)
-                self.forecasts = forecast!
-                
-            }
-            DispatchQueue.main.async {
-                self.presentForecast()
-            }
-        }
-        presentCityWeather()
-        //        print(cityName)
-        //        networkManager.fetchCurrentWeather(searchBy: .byCityName(cityName: cityName!))
-        networkManager.fetchCurrentWeather(searchBy: .byCityName(cityName: cityWeather.cityName))
         super.viewDidLoad()
+        networkManager = NetworkManager()
+        setUpView()
+        getForecast()
+        presentPassedCityWeather()
     }
     
     
-    func presentForecast() {
+    func setUpView() {
+        topView.layer.cornerRadius = 20
+        botomView.layer.cornerRadius = 20
+    }
+    
+    
+    func getForecast() {
+        showLoadingView()
+        networkManager.fetchWeatherForecastForCity(name: cityWeather.cityName) { [weak self] forecasts in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                self.dismissLoadingView()
+                self.presentForecast(with: forecasts)
+            }
+        }
+    }
+    
+    
+    func presentPassedCityWeather() {
+        cityNameLabel.text = cityWeather.cityName
+        temperatureLabel.text = cityWeather.temperatureString
+        feelsLikeTemperatureLabel.text = cityWeather.feelsLikeTemperatureString
+        windLabel.text = cityWeather.widString
+        weatherImageView.image = UIImage(systemName: cityWeather.icon)
+    }
+    
+    
+    func presentForecast(with forecasts: [ShortCityWeather]) {
         var i = 1
         for forecast in forecasts {
             for _ in 0...2 {
@@ -73,14 +77,5 @@ class DetailedWeatherViewController: UIViewController {
                 i += 1
             }
         }
-    }
-    
-    
-    func presentCityWeather() {
-        cityNameLabel.text = cityWeather.cityName
-        temperatureLabel.text = cityWeather.temperatureString
-        feelsLikeTemperatureLabel.text = cityWeather.feelsLikeTemperatureString
-        windLabel.text = cityWeather.widString
-        weatherImageView.image = UIImage(systemName: cityWeather.icon)
     }
 }

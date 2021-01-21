@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct CityTableWeather {
+struct CurrentCityWeather {
     let temperature: Double
     var temperatureString: String {
         return "\(Int(round(temperature))) °C"
@@ -20,7 +20,7 @@ struct CityTableWeather {
     
     let wind: Double
     var widString: String {
-        return "Wind: \(wind) kph"
+        return "Wind: \(Int(wind)) kph"
     }
     
     let cityName: String
@@ -40,7 +40,7 @@ struct CityTableWeather {
         }
     }
     
-    init(currentWeatherData: CurrentWeatherData){
+    init(currentWeatherData: CurrentCityWeatherData){
         temperature = currentWeatherData.main.temperature
         feelsLikeTempereture = currentWeatherData.main.feelsLikeTemperature
         cityName = currentWeatherData.cityName

@@ -7,7 +7,7 @@
 
 import UIKit
 
-class DataLoadingVC: UITableViewController {
+class DataLoadingTableVC: UITableViewController {
     
     var containerView: UIView!
 

@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct FourDayForecast {
+struct ShortCityWeather {
     let temperature: Double
     var temperatureString: String {
         return "\(Int(round(temperature))) °C"
@@ -20,7 +20,6 @@ struct FourDayForecast {
         return dateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(dateSince1970)))
         
     }
-    
     
     let dateSince1970: Int
     

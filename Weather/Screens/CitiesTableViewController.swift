@@ -22,7 +22,7 @@ class CitiesTableViewController: DataLoadingTableVC {
         return locationManager
     }()
     
-    var storage: Storage!
+    var storage: StorageProtocol!
     
     var cityNames: [String] {
             storage.getCities()
